@@ -55,7 +55,7 @@ public actor CodexAppServerClient {
     }
 
     public func readRateLimits() async throws -> RateLimitPayload {
-        if process?.isRunning != true { try start() }
+        if process?.isRunning != true || initializationError != nil { try start() }
         let session = sessionID
         try await ensureInitialized()
         try requireInitializedSession(session)
@@ -80,7 +80,7 @@ public actor CodexAppServerClient {
     }
 
     public func readAccountUsage() async throws -> AccountUsagePayload {
-        if process?.isRunning != true { try start() }
+        if process?.isRunning != true || initializationError != nil { try start() }
         let session = sessionID
         try await ensureInitialized()
         try requireInitializedSession(session)
@@ -106,7 +106,7 @@ public actor CodexAppServerClient {
     }
 
     public func readAccount(refreshToken: Bool = false) async throws -> CodexAccount? {
-        if process?.isRunning != true { try start() }
+        if process?.isRunning != true || initializationError != nil { try start() }
         let session = sessionID
         try await ensureInitialized()
         try requireInitializedSession(session)
@@ -137,7 +137,15 @@ public actor CodexAppServerClient {
         do {
             let credentials = try await readUsageCredentials()
             try requireInitializedSession(session)
-            let days = try await webUsageClient.readDailyUsage(credentials: credentials, now: now, calendar: calendar)
+            let days = try await webUsageClient.readDailyUsage(credentials: credentials, now: now, calendar: calendar,
+                isCurrent: {
+                    do {
+                        try await self.requireInitializedSession(session)
+                        return true
+                    } catch {
+                        return false
+                    }
+                })
             try requireInitializedSession(session)
             return usage.includingWebUsage(days, now: now, calendar: calendar)
         } catch {

@@ -16,7 +16,7 @@
 ./scripts/test.sh
 ```
 
-所有平台都会执行发布脚本和源码归档检查，以及 10 项核心 Swift 检查。macOS 还会执行 app-server 协议样本、Swift Package 构建、界面与图表测试，以及 CLI 冒烟测试。界面测试需要可用的 macOS 图形会话。
+所有平台都会执行发布脚本和源码归档检查，以及 11 项核心 Swift 检查。macOS 还会执行 app-server 协议样本、Swift Package 构建、界面与图表测试，以及 CLI 冒烟测试。界面测试需要可用的 macOS 图形会话。
 
 默认测试不连接已登录服务。仅在希望验证本机真实服务时使用：
 

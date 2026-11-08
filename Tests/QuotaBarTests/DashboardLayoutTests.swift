@@ -4,6 +4,52 @@ import XCTest
 @testable import QuotaBar
 
 final class DashboardLayoutTests: XCTestCase {
+    @MainActor
+    func testDisclosureHeaderRespondsToBlankSpaceAndKeepsContentInteractive() async throws {
+        _ = NSApplication.shared
+        let state = DisclosureProbeState()
+        let controller = NSHostingController(rootView: DisclosureClickProbe(state: state))
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 320, height: 120),
+            styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = controller
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        controller.view.layoutSubtreeIfNeeded()
+
+        // The middle and trailing space, arrow and title must each toggle once.
+        for x: CGFloat in [160, 315, 5, 30, 160] {
+            let wasExpanded = state.isExpanded
+            try click(at: NSPoint(x: x, y: 108), in: window)
+            try await Task.sleep(for: .milliseconds(100))
+            XCTAssertEqual(state.isExpanded, !wasExpanded)
+        }
+        XCTAssertTrue(state.isExpanded)
+        try click(at: NSPoint(x: 30, y: 84), in: window)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(state.contentClicks, 1)
+        XCTAssertTrue(state.isExpanded, "Clicking expanded content must not toggle its header")
+    }
+
+    @MainActor
+    private func click(at point: NSPoint, in window: NSWindow) throws {
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [],
+            timestamp: timestamp, windowNumber: window.windowNumber, context: nil,
+            eventNumber: 0, clickCount: 1, pressure: 1))
+        let up = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [],
+            timestamp: timestamp + 0.01, windowNumber: window.windowNumber, context: nil,
+            eventNumber: 1, clickCount: 1, pressure: 0))
+        // Native button tracking can wait for mouse-up before sendEvent returns.
+        NSApp.postEvent(up, atStart: true)
+        window.sendEvent(down)
+        if let pending = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) {
+            window.sendEvent(pending)
+        }
+    }
+
     func testPanelFitsCommonScreenHeights() {
         for visibleHeight: CGFloat in [600, 768, 900, 1080, 1440] {
             let size = DashboardPanelLayout.size(visibleHeight: visibleHeight)
@@ -236,6 +282,36 @@ final class DashboardLayoutTests: XCTestCase {
             if let scroll = findScrollView(in: child) { return scroll }
         }
         return nil
+    }
+}
+
+@MainActor
+private final class DisclosureProbeState: ObservableObject {
+    @Published var isExpanded = false
+    @Published var contentClicks = 0
+}
+
+@MainActor
+private struct DisclosureClickProbe: View {
+    @ObservedObject var state: DisclosureProbeState
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $state.isExpanded) {
+            Button {
+                state.contentClicks += 1
+            } label: {
+                Text("Content action").frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+        } label: {
+            HStack {
+                Text("Title")
+                Spacer()
+                Text("Detail")
+            }
+        }
+        .disclosureGroupStyle(FullRowDisclosureStyle())
+        .frame(width: 320, height: 120, alignment: .topLeading)
     }
 }
 

@@ -140,6 +140,8 @@ public enum AppLocalization {
         "Codex account totals": "Codex 账号累计统计",
         "Open Codex settings": "打开 Codex 设置",
         "Retry": "重试",
+        "Expanded": "已展开",
+        "Collapsed": "已收起",
         "%@: %@ tokens": "%@：%@ 个 token",
         "This Codex version does not provide account analytics. Update Codex and retry, or open Usage and billing → Analytics in Codex settings.": "此 Codex 版本未提供账号分析接口。请更新 Codex 后重试，或前往 Codex 设置中的“使用情况和计费 → 分析”查看。",
         "Codex returned account analytics in an unknown or inconsistent format.": "Codex 返回的账号分析格式未知或数据不一致。",

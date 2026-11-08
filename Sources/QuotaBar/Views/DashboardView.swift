@@ -29,6 +29,7 @@ struct DashboardView: View {
             }
         }
         .id(store.language)
+        .disclosureGroupStyle(FullRowDisclosureStyle())
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.celebration)
         .environment(\.locale, AppLocalization.locale)
         .background(.ultraThinMaterial)

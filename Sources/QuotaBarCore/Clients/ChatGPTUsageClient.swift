@@ -74,12 +74,30 @@ public final class ChatGPTUsageClient: Sendable {
     }
 
     func readDailyUsage(credentials: ChatGPTUsageCredentials, now: Date = Date(),
-                        calendar: Calendar = .current) async throws -> [AccountUsageDay] {
-        let (data, response) = try await session.data(for: Self.request(credentials: credentials, now: now, calendar: calendar))
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-              data.count <= 2_000_000 else { throw AccountUsageError.invalidResponse }
-        return try AccountUsageParser.parseWebResponse(data)
+                        calendar: Calendar = .current,
+                        isCurrent: @Sendable () async -> Bool = { true }) async throws -> [AccountUsageDay] {
+        do {
+            return try await UsageFetchRetry.run(shouldRetry: { error in
+                if let failure = error as? UsageHTTPFailure {
+                    return failure.statusCode == 408 || failure.statusCode == 429 || (500...599).contains(failure.statusCode)
+                }
+                return (error as? AccountUsageError) != .invalidResponse
+            }) {
+                guard await isCurrent() else { throw CancellationError() }
+                let (data, response) = try await self.session.data(for: Self.request(credentials: credentials, now: now, calendar: calendar))
+                guard let http = response as? HTTPURLResponse else { throw AccountUsageError.invalidResponse }
+                guard http.statusCode == 200 else { throw UsageHTTPFailure(statusCode: http.statusCode) }
+                guard data.count <= 2_000_000 else { throw AccountUsageError.invalidResponse }
+                return try AccountUsageParser.parseWebResponse(data)
+            }
+        } catch is UsageHTTPFailure {
+            throw AccountUsageError.invalidResponse
+        }
     }
+}
+
+private struct UsageHTTPFailure: Error {
+    let statusCode: Int
 }
 
 private final class NoUsageRedirects: NSObject, URLSessionTaskDelegate, Sendable {
