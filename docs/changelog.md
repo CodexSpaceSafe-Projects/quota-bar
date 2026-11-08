@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Retry failed quota and account-history fetches up to five times with 1, 2, 4, 8 and 16 second exponential backoff; stop on success, cancellation or stale account requests. Retry temporary web analytics failures before retaining Codex history.
+- Make every disclosure header clickable across its full row, including blank space, for usage windows, account history, daily details and settings.
+
 - Reorganized app lifecycle, presentation models, views, core domains, CLI commands, resources and tests by responsibility.
 - Rebuilt the Chinese-first README and development guide; centralized offline test execution and added portable source exports with checksum and one-commit Git validation.
 

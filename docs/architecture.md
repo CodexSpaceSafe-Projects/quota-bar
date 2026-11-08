@@ -25,6 +25,8 @@ The executable locator checks explicit `CODEX_PATH`, selected/active/registered 
 
 Quota errors, account operation errors and quota-history storage errors have separate display states. Notification authorization does not block polling. The status item checks data age every 30 seconds and refreshes quota after macOS wakes.
 
+Quota and account-history fetches retry transient failures at most five times after the initial attempt, waiting 1, 2, 4, 8 and 16 seconds. Loading remains active for the entire fetch, successful reads stop retrying, and cancellation or profile/client generation changes prevent further requests and stale updates. Missing executables, unsupported analytics and unverified accounts return immediately. A rejected app-server initialization is replaced on the next read. Optional web analytics also retry network failures and HTTP 408/429/5xx responses before falling back to the Codex payload; permanent HTTP errors and malformed data fall back immediately.
+
 ## Account quota history
 
 The app records the same backend account snapshot every two minutes; it no longer scans rollout logs. `credits` is the backend credit balance, not money or tokens. Missing balances and reset counts stay unavailable. Account snapshots include usage from cloud sessions and other devices; the source does not identify which device caused a change.

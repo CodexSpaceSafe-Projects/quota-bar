@@ -15,7 +15,7 @@ CHECKS = ROOT / 'Tests/Checks'
 LOCALIZATION = 'Localization/AppLocalization'
 QUOTA = 'Quota/RateLimitModels'
 ANALYTICS = 'Analytics/AccountUsageModels'
-CLIENT_SOURCES = [LOCALIZATION, QUOTA, ANALYTICS, 'Clients/ChatGPTUsageClient',
+CLIENT_SOURCES = [LOCALIZATION, QUOTA, ANALYTICS, 'Clients/UsageFetchRetry', 'Clients/ChatGPTUsageClient',
                   'Clients/CodexAppServerClient', 'System/CodexExecutableLocator',
                   'System/CodexProcessDiagnostics']
 OFFLINE_CHECKS = [
@@ -23,7 +23,8 @@ OFFLINE_CHECKS = [
     ('Quota/WeeklyPaceCheck', [LOCALIZATION, QUOTA]),
     ('Quota/AccountQuotaHistoryCheck', [LOCALIZATION, QUOTA, 'Quota/AccountQuotaHistory']),
     ('Analytics/AccountUsageCheck', [LOCALIZATION, ANALYTICS]),
-    ('Analytics/ChatGPTUsageCheck', [LOCALIZATION, ANALYTICS, 'Clients/ChatGPTUsageClient']),
+    ('Analytics/ChatGPTUsageCheck', [LOCALIZATION, ANALYTICS, 'Clients/UsageFetchRetry', 'Clients/ChatGPTUsageClient']),
+    ('Clients/UsageFetchRetryCheck', ['Clients/UsageFetchRetry']),
     ('Activity/ActivityCheck', [LOCALIZATION, 'Activity/LocalActivity']),
     ('Accounts/AccountProfileStorageCheck', [LOCALIZATION, 'Accounts/AccountProfileStorage']),
     ('Localization/LocalizationCheck', [LOCALIZATION, QUOTA, 'Activity/LocalActivity']),

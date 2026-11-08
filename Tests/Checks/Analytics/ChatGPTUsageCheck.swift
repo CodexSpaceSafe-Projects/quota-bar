@@ -92,7 +92,51 @@ enum ChatGPTUsageCheck {
         let client = ChatGPTUsageClient(session: URLSession(configuration: config))
         let fetched = try await client.readDailyUsage(credentials: credential, now: now, calendar: shanghai)
         precondition(fetched.first?.tokens == 123 && fetched.first?.day == "2026-10-21")
+
+        let transientConfig = URLSessionConfiguration.ephemeral
+        transientConfig.protocolClasses = [TransientUsageFixtureProtocol.self]
+        let transientClient = ChatGPTUsageClient(session: URLSession(configuration: transientConfig))
+        let recovered = try await transientClient.readDailyUsage(credentials: credential, now: now, calendar: shanghai)
+        precondition(recovered == fetched && TransientUsageFixtureProtocol.counter.count == 3)
+
+        TransientUsageFixtureProtocol.counter.reset()
+        do {
+            _ = try await transientClient.readDailyUsage(credentials: credential, now: now, calendar: shanghai,
+                isCurrent: { TransientUsageFixtureProtocol.counter.count == 0 })
+            preconditionFailure("An invalidated session must stop web retries")
+        } catch is CancellationError {}
+        precondition(TransientUsageFixtureProtocol.counter.count == 1)
         print("ChatGPT daily usage request, HTTP, parsing, provenance, fallback and date-boundary checks passed")
+    }
+}
+
+private final class TransientUsageFixtureProtocol: URLProtocol, @unchecked Sendable {
+    static let counter = RequestCounter()
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let statusCode = Self.counter.increment() < 3 ? 503 : 200
+        let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"data":[{"date":"2026-10-21","totals":{"text_total_tokens":123}}]}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+private final class RequestCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requests = 0
+
+    var count: Int { lock.withLock { requests } }
+    func reset() { lock.withLock { requests = 0 } }
+    func increment() -> Int {
+        lock.withLock {
+            requests += 1
+            return requests
+        }
     }
 }
 

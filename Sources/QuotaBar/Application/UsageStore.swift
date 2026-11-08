@@ -335,8 +335,20 @@ final class UsageStore: ObservableObject {
             guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation) else { return }
         }
         do {
-            let accountBefore = try? await requestClient.readAccount()
-            let newPayload = try await requestClient.readRateLimits()
+            let (accountBefore, newPayload) = try await UsageFetchRetry.run(
+                shouldRetry: { ($0 as? CodexClientError) != .executableNotFound }
+            ) {
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation) else {
+                    throw CancellationError()
+                }
+                let account = try? await requestClient.readAccount()
+                try Task.checkCancellation()
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation) else {
+                    throw CancellationError()
+                }
+                let payload = try await requestClient.readRateLimits()
+                return (account, payload)
+            }
             guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation) else { return }
             if let key = analyticsAccountKey, Self.analyticsIdentity(for: accountBefore) != key {
                 clearAnalytics()
@@ -394,6 +406,8 @@ final class UsageStore: ObservableObject {
             Task { [weak self] in
                 await self?.notifyIfNeeded(newPayload, accountID: accountID, generation: generation)
             }
+        } catch is CancellationError {
+            return
         } catch {
             guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation) else { return }
             rediscoverClientOnNextRefresh = (error as? CodexClientError) == .executableNotFound
@@ -422,18 +436,37 @@ final class UsageStore: ObservableObject {
             }
         }
         do {
-            let before = try await requestClient.readAccount()
+            let usage = try await UsageFetchRetry.run(shouldRetry: { error in
+                (error as? CodexClientError) != .executableNotFound
+                    && (error as? AccountUsageError) != .unsupported
+                    && (error as? AccountUsageError) != .unverifiedAccount
+            }) {
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else {
+                    throw CancellationError()
+                }
+                let before = try await requestClient.readAccount()
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else {
+                    throw CancellationError()
+                }
+                guard let identity = Self.analyticsIdentity(for: before) else { throw AccountUsageError.unverifiedAccount }
+                if analyticsAccountKey != identity { analytics = nil }
+                analyticsAccountKey = identity
+                let usage = try await requestClient.readAccountUsageIncludingToday()
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else {
+                    throw CancellationError()
+                }
+                let after = try await requestClient.readAccount()
+                guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else {
+                    throw CancellationError()
+                }
+                guard before == after, Self.analyticsIdentity(for: after) == identity else { throw AccountUsageError.unverifiedAccount }
+                return usage
+            }
             guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else { return }
-            guard let identity = Self.analyticsIdentity(for: before) else { throw AccountUsageError.unverifiedAccount }
-            if analyticsAccountKey != identity { analytics = nil }
-            analyticsAccountKey = identity
-            let usage = try await requestClient.readAccountUsageIncludingToday()
-            guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else { return }
-            let after = try await requestClient.readAccount()
-            guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else { return }
-            guard before == after, Self.analyticsIdentity(for: after) == identity else { throw AccountUsageError.unverifiedAccount }
             analytics = usage
             setAnalyticsError(nil)
+        } catch is CancellationError {
+            return
         } catch {
             guard isCurrentRequest(client: requestClient, accountID: accountID, generation: generation), analyticsToken == analyticsGeneration else { return }
             if error as? AccountUsageError == .unverifiedAccount {
