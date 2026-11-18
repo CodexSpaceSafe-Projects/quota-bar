@@ -205,8 +205,15 @@ public struct AccountCredits: Equatable, Sendable, Codable {
 
     public var displayBalance: String {
         if unlimited { return AppLocalization.text("Unlimited") }
-        if let balance, !balance.isEmpty { return balance }
-        return AppLocalization.text(hasCredits ? "Unavailable" : "No credits")
+        guard let balance, !balance.isEmpty else {
+            return AppLocalization.text(hasCredits ? "Unavailable" : "No credits")
+        }
+        let scanner = Scanner(string: balance)
+        scanner.locale = Locale(identifier: "en_US_POSIX")
+        guard let amount = scanner.scanDecimal(), scanner.isAtEnd else { return balance }
+        if amount.magnitude < 1 { return "0" }
+        return amount.formatted(.number.locale(AppLocalization.locale)
+            .precision(.fractionLength(0)).rounded(rule: .towardZero).grouping(.never))
     }
 }
 
