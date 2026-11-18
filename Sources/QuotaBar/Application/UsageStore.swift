@@ -917,7 +917,7 @@ enum ResetTimeFormatter {
     }
 
     static func notificationText(for date: Date?) -> String {
-        guard let date else { return AppLocalization.text("The reset time is unavailable.") }
-        return AppLocalization.format("It resets %@.", date.formatted(.dateTime.hour().minute().locale(AppLocalization.locale)))
+        guard let resetTime = absoluteText(for: date) else { return AppLocalization.text("The reset time is unavailable.") }
+        return AppLocalization.format("It resets %@.", resetTime)
     }
 }
