@@ -916,8 +916,26 @@ enum ResetTimeFormatter {
         return date.formatted(.dateTime.year().month(.abbreviated).day().hour().minute().locale(AppLocalization.locale))
     }
 
-    static func notificationText(for date: Date?) -> String {
-        guard let resetTime = absoluteText(for: date) else { return AppLocalization.text("The reset time is unavailable.") }
-        return AppLocalization.format("It resets %@.", resetTime)
+    static func notificationText(for date: Date?, now: Date = Date(), calendar: Calendar = .current) -> String {
+        guard let date else { return AppLocalization.text("The reset time is unavailable.") }
+        guard date > now else { return AppLocalization.text("Resetting now") }
+
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+        let minute = calendar.component(.minute, from: date)
+        let time: String
+        if AppLocalization.isChinese {
+            let hour = calendar.component(.hour, from: date)
+            time = minute == 0 ? "\(hour)点" : "\(hour)点\(minute)分"
+        } else {
+            var style = Date.FormatStyle().hour().locale(AppLocalization.locale)
+            style.timeZone = calendar.timeZone
+            time = date.formatted(minute == 0 ? style : style.minute())
+        }
+
+        switch days {
+        case 0: return AppLocalization.format("It resets today at %@.", time)
+        case 1: return AppLocalization.format("It resets tomorrow at %@.", time)
+        default: return AppLocalization.format("It resets in %d days at %@.", days, time)
+        }
     }
 }
